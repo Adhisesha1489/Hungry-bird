@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hungry Bird</title>
+    <style>
+        /* BASE STYLES & RESETS */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden; font-family: 'Arial', sans-serif;
+            background-color: #111; color: #333; -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none; position: relative;
+        }
+
+        /* GAME TITLE HEADER - HIDDEN BY DEFAULT */
+        #gameTitleHeader {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            display: none; /* Hidden by default, shown via JS */
+        }
+        #gameTitleHeader h1 {
+            font-size: clamp(1.2em, 3vw, 1.6em);
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin: 0;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* GAME SUPER CONTAINER & SCREEN STYLES (Identical to previous) */
+        .game-super-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; }
+        .screen { width: 100vw; height: 100vh; max-width: 450px; max-height: 800px; position: absolute; display: none; flex-direction: column; align-items: center; background-color: #f0f0f0; box-shadow: 0 0 15px rgba(0,0,0,0.2); overflow: hidden; padding: 15px; }
+        .screen.active { display: flex; z-index: 10; }
+        button, .button-like { padding: 10px 18px; font-size: 1em; font-weight: bold; cursor: pointer; border-radius: 8px; background-color: #D2691E; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.2); transition: background-color 0.2s, transform 0.1s; margin: 8px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 5px rgba(0,0,0,0.2); border: 2px outset #A0522D; line-height: 1.2; min-width: auto; }
+        button:hover, .button-like:hover { background-color: #B85C1E; transform: translateY(-1px); }
+        button:active, .button-like:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.2); border-style: inset; }
+        button img, .button-like img { vertical-align: middle; max-height: 24px; margin-right: 8px; }
+        button.icon-only img, .button-like.icon-only img { margin-right: 0; max-height: 35px; }
+        h2 { margin-top: 0; color: #4A4A4A; margin-bottom: 20px; text-align: center; font-size: 1.5em; }
+        #mainMenuScreen { background-color: #FFA500; justify-content: space-between; padding: 15px; }
+        #mainMenuHeader { width: 100%; display: flex; justify-content: flex-end; align-items: center; padding: 5px; flex-shrink: 0; min-height: 50px; }
+        #mainMenuTopRightButtons { display: flex; gap: 8px; }
+        #mainMenuTopRightButtons button { background-color: #F5F5DC; border: 2px outset #8B4513; border-radius: 8px; padding: 5px; }
+        #mainMenuTopRightButtons button img { width: 35px; height: 35px; margin: 0; }
+        #mainMenuCentralContent { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; flex-grow: 1; padding: 10px 0; }
+        #gameIcon { width: 120px; margin-bottom: 20px; animation: floatIcon 3s ease-in-out infinite; }
+        @keyframes floatIcon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        #playButtonContainer button { background-color: #F5F5DC; border: 3px outset #8B4513; border-radius: 10px; width: 180px; padding: 8px; }
+        #playButtonContainer button img { width: 100px; height: auto; margin: 0; }
+        #gameplayScreen { padding: 0; background-color: #70c5ce; }
+        #gameArea { width: 100%; height: 100%; position: relative; overflow: hidden; background-image: url('background.png'); background-size: cover; background-position: 0 0; background-repeat: repeat-x; animation: scrollBackground 20s linear infinite; }
+        @keyframes scrollBackground { 0% { background-position-x: 0; } 100% { background-position-x: -1600px; } }
+        #playerBird { width: 50px; height: auto; position: absolute; left: 50px; transition: top 0.05s linear; z-index: 10; }
+        #birdNameOnCharacterDisplay { position: absolute; background-color: rgba(0,0,0,0.65); color: white; padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: normal; z-index: 11; display: none; white-space: nowrap; }
+        #hud { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-around; align-items: center; padding: 8px 5px; background-color: rgba(0,0,0,0.4); z-index: 20; height: 50px; gap: 5px; }
+        #hudLeft, #hudRight { display: flex; align-items: center; gap: 10px; }
+        #gameScoreDisplay { font-size: 1em; color:white; font-weight:bold; }
+        #hungryBarContainer { width: 90px; height: 14px; background-color: #555; border: 1px solid #fff; border-radius: 4px; overflow: hidden; }
+        #hungryBarFill { width: 100%; height: 100%; background-color: #76ff03; transition: width 0.3s linear; }
+        #livesContainer img, #coinCounterGameplay img { width: 20px; height: 20px; margin-right: 3px; }
+        #livesCount, #currentCoins { font-size: 0.95em; color:white; font-weight:bold; }
+        #gameControls { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 20; }
+        #gameControls img { width: 50px; height: 50px; cursor: pointer; opacity: 0.8; }
+        #gameControls img:hover { opacity: 1; }
+        #pauseBtnContainer { position: absolute; top: 10px; right: 10px; z-index: 25; }
+        #pauseBtnContainer button { background-color: transparent; padding: 0; border: none; box-shadow: none; }
+        #pauseBtnContainer button img { width: 30px; height: 30px; opacity: 0.8; margin: 0; }
+        #pauseBtnContainer button img:hover { opacity: 1; }
+        #pauseOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 500; }
+        #pauseOverlay.hidden { display: none !important; }
+        #pauseOverlay h2 { color: white; font-size: 2em; margin-bottom: 20px; }
+        .gameObject { position: absolute; background-size: contain; background-repeat: no-repeat; z-index: 5; }
+        .foodItem { width: 30px; height: 30px; }
+        .obstacleItem { width: 50px; height: 50px; }
+        .collectibleCoin { width: 25px; height: 25px; }
+        #checkpointMessage { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(30, 180, 30, 0.85); color: white; padding: 15px 30px; font-size: 1.5em; border-radius: 8px; z-index: 50; opacity: 0; transition: opacity 0.5s ease-in-out; pointer-events: none; }
+        #checkpointMessage.show { opacity: 1; }
+        #settingsScreen { background-color: #f8f8f8; gap: 10px; padding: 15px; justify-content: space-between; }
+        #settingsScreen h2 { margin-bottom: 20px; font-size: 1.5em; }
+        #settingsItemsContainer { width: 100%; max-width: 90vw; margin: 0 auto; overflow-y: auto; padding: 0 5px; flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
+        #settingsScreen .setting-item { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; width: 100%; padding: 12px 15px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); min-height: 40px; }
+        #settingsScreen label { font-size: 0.95em; }
+        #settingsScreen input[type="checkbox"] { transform: scale(1.1); margin-left:auto; }
+        #settingsHighScoreDisplay { font-size: 0.95em; font-weight: bold; color: #2a9d8f;}
+        #settingsButtonsContainer { margin-top: auto; padding-top: 15px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; border-top: 1px solid #eee; }
+        .settings-action-button { width: 200px; max-width: 90%; }
+        #resetGameDataBtn { background-color: #e76f51; border-color: #c05030 #903010 #903010 #c05030; }
+        #resetGameDataBtn:hover { background-color: #d15a3a; }
+        #marketplaceScreen { background-color: #faf0e6; justify-content: flex-start; padding: 10px; }
+        #marketplaceHeader { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0 10px 10px 10px; border-bottom: 1px solid #e0c9b0; margin-bottom: 10px; }
+        #marketplaceScreen h2 { font-size: 1.4em; }
+        #marketplaceCoinDisplay { padding: 5px 8px; border-radius: 12px; display:flex; align-items:center; background-color: rgba(255,255,255,0.7); }
+        #marketplaceCoinDisplay img { width: 22px; height: 22px; margin-right: 5px; }
+        #lifetimeCoinsDisplay { font-size: 1.1em; font-weight:bold; color: #d2691e;}
+        #birdSelectionContainer { width: 100%; flex-grow: 1; overflow-y: auto; padding: 5px; }
+        #birdSelection { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-around; padding-bottom: 10px; }
+        .bird-option { padding: 10px; width: 140px; border: 3px outset #bcaaa4; text-align:center; border-radius:10px; background-color: #fff8f0; transition: border-color 0.3s, box-shadow 0.3s; display:flex; flex-direction:column; align-items:center; justify-content:space-between;}
+        .bird-option:hover { border-color: #ffA500; box-shadow: 0 0 10px rgba(255,165,0,0.5); }
+        .bird-option img { width: 60px; height: 60px; object-fit:contain; margin-bottom:5px;}
+        .bird-option p { font-size: 1em; font-weight:bold; margin: 3px 0 6px 0;}
+        .bird-option .status, .bird-option .price { font-size: 0.85em; color:#555; display:block; margin-top:4px; min-height:18px;}
+        .bird-option .price { color: #d2691e; font-weight:bold;}
+        .bird-option button { width: 100%; padding: 8px 10px; font-size: 0.9em; margin-top:auto;}
+        .bird-option.selected-style { border-color: #4CAF50; border-style: inset; background-color: #e8f5e9; }
+        #marketplaceFooter { padding: 8px 0; border-top: 1px solid #e0c9b0; text-align: center; margin-top:auto; }
+        #backFromMarketplaceBtn { width: 200px; max-width: 90%; }
+        #endGameScreen { background-color: #e6f7ff; text-align: center; justify-content: space-around; }
+        #endGameScreen h2 { font-size: 2.2em; }
+        #endGameScreen p { font-size: 1.1em; }
+        #endGameButtons {margin-top:20px;}
+        #endGameButtons button { width: 180px; max-width: 80%;}
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="gameTitleHeader"> <!-- Stays outside .game-super-container for global fixed positioning -->
+    <h1>Hungry Bird</h1>
+</div>
+
+<div class="game-super-container">
+    <!-- Main Menu Screen -->
+    <div id="mainMenuScreen" class="screen active">
+        <div id="mainMenuHeader">
+            <div id="mainMenuTopRightButtons">
+                 <button id="settingsBtn" class="icon-only"><img src="settings.png" alt="Settings"></button>
+                 <button id="marketplaceBtn" class="icon-only"><img src="marketplace.png" alt="Marketplace"></button>
+            </div>
+        </div>
+        <div id="mainMenuCentralContent">
+            <img src="game_icon.png" alt="Hungry Bird Icon" id="gameIcon">
+            <div id="playButtonContainer">
+                <button id="playBtn" class="icon-only"><img src="play_button.png" alt="Play"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gameplay Screen -->
+    <div id="gameplayScreen" class="screen">
+        <div id="hud"> <div id="hudLeft"> <div id="gameScoreDisplay">Score: 0</div> <div id="hungryBarContainer"><div id="hungryBarFill"></div></div> </div> <div id="hudRight"> <div id="livesContainer"><img src="heart.png" alt="Life"><span id="livesCount">3</span></div> <div id="coinCounterGameplay"><img src="snacgry_coins.png" alt="Coin"><span id="currentCoins">0</span></div> </div> </div> <div id="gameArea"> <img id="playerBird" src="crow.gif" alt="Bird"> <div id="birdNameOnCharacterDisplay">Crow</div></div> <div id="gameControls"> <img src="up_arrow.png" alt="Up" id="upArrowBtn"> <img src="down_arrow.png" alt="Down" id="downArrowBtn"> </div> <div id="pauseBtnContainer"> <button id="pauseBtn" class="icon-only"><img src="pause_button.png" alt="Pause"></button> </div> <div id="pauseOverlay" class="hidden"> <h2>PAUSED</h2> <button id="resumeBtn">Resume</button> <button id="mainMenuFromPauseBtn">Main Menu</button> </div> <div id="checkpointMessage" class="hidden"></div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settingsScreen" class="screen">
+        <h2>Settings</h2>
+        <div id="settingsItemsContainer">
+            <div class="setting-item"> <label for="soundToggle">Sound:</label> <input type="checkbox" id="soundToggle"> </div>
+            <div class="setting-item"> <label for="showNameToggle">Show Bird Name:</label> <input type="checkbox" id="showNameToggle"> </div>
+            <div class="setting-item"> <label>High Score:</label> <span id="settingsHighScoreDisplay">0</span> </div>
+        </div>
+        <div id="settingsButtonsContainer">
+            <button id="resetGameDataBtn" class="settings-action-button">Reset Game Data</button>
+            <button id="backFromSettingsBtn" class="settings-action-button"><img src="BACK.png" alt="Back" style="max-height: 20px; margin:0 5px 0 0;"> Back</button>
+        </div>
+    </div>
+
+    <!-- Marketplace Screen -->
+    <div id="marketplaceScreen" class="screen">
+        <div id="marketplaceHeader"> <h2>Marketplace</h2> <div id="marketplaceCoinDisplay"> <img src="snacgry_coins.png" alt="Coin"> <span id="lifetimeCoinsDisplay">0</span> </div> </div> <div id="birdSelectionContainer"> <div id="birdSelection"> <div class="bird-option" data-bird="crow"> <img src="crow.gif" alt="Crow"> <p>Crow</p> <span class="status">Free</span> <button class="select-bird-btn" data-bird-name="crow">Select</button> </div> <div class="bird-option" data-bird="sparrow"> <img src="sparrow.gif" alt="Sparrow"> <p>Sparrow</p> <span class="price">40 COINS</span> <span class="status hidden"></span> <button class="purchase-bird-btn" data-bird-name="sparrow" data-price="40">Purchase</button> <button class="select-bird-btn hidden" data-bird-name="sparrow">Select</button> </div> </div> </div> <div id="marketplaceFooter"> <button id="backFromMarketplaceBtn"><img src="BACK.png" alt="Back" style="max-height: 20px; margin:0 5px 0 0;"> Back</button> </div>
+    </div>
+
+    <!-- Win/Game Over Screen -->
+    <div id="endGameScreen" class="screen">
+        <h2 id="endGameTitle">YOU WIN!</h2> <p>Your Score: <span id="roundScoreDisplay">0</span></p> <p>Coins collected: <span id="roundCoinsDisplay">0</span></p> <p>Total play time: <span id="playTimeDisplay">00:00:00</span></p> <div id="endGameButtons"> <button id="playAgainBtn">Play Again</button> <button id="mainMenuFromEndBtn">Main Menu</button> </div>
+    </div>
+
+    <audio id="eatSound" src="bird_eat.wav" preload="auto"></audio>
+    <audio id="gameOverSound" src="gameover.wav" preload="auto"></audio>
+    <audio id="gameWonSound" src="gamewon.wav" preload="auto"></audio>
+
+</div>
+
+<script>
+    'use strict';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Element Selections ---
+        const screens = { mainMenu: document.getElementById('mainMenuScreen'), gameplay: document.getElementById('gameplayScreen'), settings: document.getElementById('settingsScreen'), marketplace: document.getElementById('marketplaceScreen'), endGame: document.getElementById('endGameScreen'), };
+        const playerBirdElement = document.getElementById('playerBird');
+        const birdNameOnCharacterDisplay = document.getElementById('birdNameOnCharacterDisplay');
+        const gameArea = document.getElementById('gameArea');
+        const hudElements = { scoreDisplay: document.getElementById('gameScoreDisplay'), hungryBarFill: document.getElementById('hungryBarFill'), livesCount: document.getElementById('livesCount'), currentCoins: document.getElementById('currentCoins'), };
+        const checkpointMessageElement = document.getElementById('checkpointMessage');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const settingsHighScoreDisplay = document.getElementById('settingsHighScoreDisplay');
+        const resetGameDataBtn = document.getElementById('resetGameDataBtn');
+        const soundToggle = document.getElementById('soundToggle');
+        const showNameToggle = document.getElementById('showNameToggle');
+        const playBtn = document.getElementById('playBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const marketplaceBtn = document.getElementById('marketplaceBtn');
+        const backFromSettingsBtn = document.getElementById('backFromSettingsBtn');
+        const backFromMarketplaceBtn = document.getElementById('backFromMarketplaceBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const mainMenuFromPauseBtn = document.getElementById('mainMenuFromPauseBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const mainMenuFromEndBtn = document.getElementById('mainMenuFromEndBtn');
+        const upArrowTouchBtn = document.getElementById('upArrowBtn');
+        const downArrowTouchBtn = document.getElementById('downArrowBtn');
+        const lifetimeCoinsDisplayMarket = document.getElementById('lifetimeCoinsDisplay');
+        const birdOptionsContainer = document.getElementById('birdSelection');
+        const endGameTitle = document.getElementById('endGameTitle');
+        const roundScoreDisplay = document.getElementById('roundScoreDisplay');
+        const roundCoinsDisplay = document.getElementById('roundCoinsDisplay');
+        const playTimeDisplay = document.getElementById('playTimeDisplay');
+        const gameSuperContainer = document.querySelector('.game-super-container');
+        const eatSound = document.getElementById('eatSound');
+        const gameOverSound = document.getElementById('gameOverSound');
+        const gameWonSound = document.getElementById('gameWonSound');
+        const gameTitleHeader = document.getElementById('gameTitleHeader'); // NEW selection
+
+        // Game State, Constants, Utility Functions
+        let gameState = {
+            currentScreen: 'mainMenu', paused: false, soundOn: true, showName: true,
+            lifetimeCoins: 0, selectedBird: 'crow',
+            birdUnlocked: { sparrow: false }, currentRoundCoins: 0, currentScore: 0, highScore: 0,
+            lives: 3, hungryPercent: 100, checkpointsReached: 0, gameStartTime: null,
+            birdProps: { y: 0, speedY: 0, gravity: 0.6, jumpStrength: -10, height: 50, width: 50, },
+            gameSpeed: 3, activeGameLoopId: null,
+            timers: { objectSpawn: null, coinSpawn: null, scoreUpdate: null, }
+        };
+        const HUNGER_DECREASE_RATE = 0.12; const FOOD_VALUE = 30; const MAX_CHECKPOINTS = 3;
+        const FOOD_IMAGE_FILES = ['food.png', 'food1.png', 'food2.png', 'food3.png'];
+        const OBSTACLE_IMAGE_FILES = ['obstacle.png', 'obstacle1.png'];
+        const COIN_IMAGE_FILE = 'snacgry_coins.png';
+        const POINTS = { PER_FOOD: 10, PER_COIN: 25, PER_SECOND_SURVIVAL: 1, };
+        const STORAGE_KEY = 'hungryBirdGameData_v10_noPlayerNameCustom';
+
+        function playSound(soundElement) { if (gameState.soundOn && soundElement && soundElement.readyState >= 2) { soundElement.currentTime = 0; soundElement.play().catch(error => { console.warn("Sound play prevented:", error, soundElement.src); }); } else if (gameState.soundOn && soundElement && soundElement.readyState < 2) { console.warn("Sound not ready to play:", soundElement.src, "RS:", soundElement.readyState); } }
+        function formatTime(milliseconds) { if (milliseconds === null || isNaN(milliseconds) || milliseconds < 0) return "00:00:00"; let totalSeconds = Math.floor(milliseconds / 1000); let hours = Math.floor(totalSeconds / 3600); totalSeconds %= 3600; let minutes = Math.floor(totalSeconds / 60); let seconds = totalSeconds % 60; return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; }
+
+        function loadGameData() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    gameState.lifetimeCoins = parseInt(parsed.lifetimeCoins) || 0;
+                    gameState.selectedBird = (parsed.selectedBird === 'crow' || parsed.selectedBird === 'sparrow') ? parsed.selectedBird : 'crow';
+                    gameState.birdUnlocked = parsed.birdUnlocked || { sparrow: false };
+                    if (parsed.settings) {
+                        gameState.soundOn = typeof parsed.settings.sound === 'boolean' ? parsed.settings.sound : true;
+                        gameState.showName = typeof parsed.settings.showName === 'boolean' ? parsed.settings.showName : true;
+                    }
+                    gameState.highScore = parseInt(parsed.highScore) || 0;
+                } catch (e) { console.error("Error parsing localStorage data:", e); localStorage.removeItem(STORAGE_KEY); }
+            }
+            updateSettingsUI();
+            updateMarketplaceUI();
+        }
+
+        function saveGameData() {
+            const dataToSave = {
+                lifetimeCoins: gameState.lifetimeCoins,
+                selectedBird: gameState.selectedBird,
+                birdUnlocked: gameState.birdUnlocked,
+                settings: { sound: gameState.soundOn, showName: gameState.showName, },
+                highScore: gameState.highScore,
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+        }
+
+        // MODIFIED showScreen to handle game title visibility
+        function showScreen(screenName) {
+            if (!screens[screenName]) {
+                console.error("Attempted to show unknown screen:", screenName);
+                return;
+            }
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+            gameState.currentScreen = screenName;
+
+            if (gameTitleHeader) { // Manage game title visibility
+                if (screenName === 'mainMenu') {
+                    gameTitleHeader.style.display = 'block';
+                } else {
+                    gameTitleHeader.style.display = 'none';
+                }
+            }
+
+            if (screenName === 'settings') updateSettingsUI();
+            else if (screenName === 'marketplace') updateMarketplaceUI();
+        }
+        function updateHud() { if (hudElements.scoreDisplay) hudElements.scoreDisplay.textContent = `Score: ${gameState.currentScore}`; if (hudElements.hungryBarFill) hudElements.hungryBarFill.style.width = `${gameState.hungryPercent}%`; if (hudElements.livesCount) hudElements.livesCount.textContent = gameState.lives; if (hudElements.currentCoins) hudElements.currentCoins.textContent = gameState.currentRoundCoins; }
+
+        function updateBirdNameOnCharacterDisplay() {
+            if (!playerBirdElement || !birdNameOnCharacterDisplay || !gameArea) return;
+            if (gameState.showName && gameState.currentScreen === 'gameplay') {
+                const currentBirdName = gameState.selectedBird.charAt(0).toUpperCase() + gameState.selectedBird.slice(1);
+                birdNameOnCharacterDisplay.textContent = currentBirdName;
+                birdNameOnCharacterDisplay.style.display = 'block';
+                const birdRect = playerBirdElement.getBoundingClientRect();
+                const gameAreaRect = gameArea.getBoundingClientRect();
+                let nameLeft = (birdRect.left - gameAreaRect.left) + (birdRect.width / 2) - (birdNameOnCharacterDisplay.offsetWidth / 2);
+                let nameTop = (birdRect.top - gameAreaRect.top) - birdNameOnCharacterDisplay.offsetHeight - 5;
+                nameLeft = Math.max(0, Math.min(nameLeft, gameAreaRect.width - birdNameOnCharacterDisplay.offsetWidth));
+                nameTop = Math.max(0, nameTop);
+                birdNameOnCharacterDisplay.style.left = `${nameLeft}px`;
+                birdNameOnCharacterDisplay.style.top = `${nameTop}px`;
+            } else {
+                birdNameOnCharacterDisplay.style.display = 'none';
+            }
+        }
+
+        function updateSettingsUI() {
+            if (soundToggle) soundToggle.checked = gameState.soundOn;
+            if (showNameToggle) showNameToggle.checked = gameState.showName;
+            if (settingsHighScoreDisplay) settingsHighScoreDisplay.textContent = gameState.highScore;
+        }
+        function updateMarketplaceUI() { if (lifetimeCoinsDisplayMarket) { lifetimeCoinsDisplayMarket.textContent = gameState.lifetimeCoins; } else { console.error("Error: lifetimeCoinsDisplayMarket element not found!"); } const birdOptionElements = birdOptionsContainer ? birdOptionsContainer.querySelectorAll('.bird-option') : []; birdOptionElements.forEach(optionEl => { const birdName = optionEl.dataset.bird; if (!birdName) return; const purchaseBtn = optionEl.querySelector('.purchase-bird-btn'); const selectBtn = optionEl.querySelector('.select-bird-btn'); const statusSpan = optionEl.querySelector('.status'); const priceSpan = optionEl.querySelector('.price'); optionEl.classList.remove('selected-style'); if(purchaseBtn) purchaseBtn.classList.add('hidden'); if(selectBtn) selectBtn.classList.add('hidden'); if(statusSpan) statusSpan.classList.add('hidden'); if(priceSpan) priceSpan.classList.add('hidden'); if (birdName === 'crow') { if(statusSpan) { statusSpan.textContent = 'Free'; statusSpan.classList.remove('hidden');} if(selectBtn) selectBtn.classList.remove('hidden'); if (gameState.selectedBird === 'crow') { if(statusSpan) statusSpan.textContent = 'Selected'; if(selectBtn) selectBtn.classList.add('hidden'); optionEl.classList.add('selected-style'); } } else if (birdName === 'sparrow') { const price = parseInt(purchaseBtn?.dataset.price || '40'); if (gameState.birdUnlocked.sparrow) { if(statusSpan) { statusSpan.textContent = 'Owned'; statusSpan.classList.remove('hidden');} if(selectBtn) selectBtn.classList.remove('hidden'); if (gameState.selectedBird === 'sparrow') { if(statusSpan) statusSpan.textContent = 'Selected'; if(selectBtn) selectBtn.classList.add('hidden'); optionEl.classList.add('selected-style'); } } else { if(priceSpan) { priceSpan.textContent = `${price} COINS`; priceSpan.classList.remove('hidden');} if(purchaseBtn) { purchaseBtn.classList.remove('hidden'); purchaseBtn.disabled = gameState.lifetimeCoins < price; } } } }); }
+        function initializeNewGame() { clearAllTimers(); resetGameStateVars(); showScreen('gameplay'); setupBird(); updateHud(); updateBirdNameOnCharacterDisplay(); startTimers(); startGameLoop(); }
+        function resetGameStateVars() { gameState.paused = false; if(pauseOverlay) pauseOverlay.classList.add('hidden'); gameState.currentRoundCoins = 0; gameState.currentScore = 0; gameState.lives = 3; gameState.hungryPercent = 100; gameState.checkpointsReached = 0; gameState.gameStartTime = Date.now(); if(gameArea) { const gameObjects = gameArea.querySelectorAll('.gameObject'); gameObjects.forEach(obj => obj.remove()); } }
+        function setupBird() { if (!playerBirdElement || !gameArea) return; playerBirdElement.src = `${gameState.selectedBird}.gif`; gameState.birdProps.height = playerBirdElement.offsetHeight || parseInt(getComputedStyle(playerBirdElement).height) || 50; gameState.birdProps.width = playerBirdElement.offsetWidth || parseInt(getComputedStyle(playerBirdElement).width) || 50; gameState.birdProps.y = (gameArea.clientHeight / 2) - (gameState.birdProps.height / 2); playerBirdElement.style.top = `${gameState.birdProps.y}px`; playerBirdElement.style.left = `50px`; gameState.birdProps.speedY = 0; }
+        function startGameLoop() { if (gameState.activeGameLoopId) cancelAnimationFrame(gameState.activeGameLoopId); function loop(timestamp) { if (gameState.paused || gameState.currentScreen !== 'gameplay') { gameState.activeGameLoopId = null; return; } gameState.birdProps.speedY += gameState.birdProps.gravity; gameState.birdProps.y += gameState.birdProps.speedY; const gameAreaHeight = gameArea.clientHeight; if (gameState.birdProps.y < 0) { gameState.birdProps.y = 0; gameState.birdProps.speedY = 0; } if (gameState.birdProps.y + gameState.birdProps.height > gameAreaHeight) { gameState.birdProps.y = gameAreaHeight - gameState.birdProps.height; gameState.birdProps.speedY = 0; } if(playerBirdElement) playerBirdElement.style.top = `${gameState.birdProps.y}px`; gameState.hungryPercent -= HUNGER_DECREASE_RATE; if (gameState.hungryPercent <= 0) { gameState.hungryPercent = 0; if (gameState.lives > 0 && !gameState.paused) gameOver("Starved!"); } moveGameObjects(); checkCollisions(); updateHud(); updateBirdNameOnCharacterDisplay(); gameState.activeGameLoopId = requestAnimationFrame(loop); } gameState.activeGameLoopId = requestAnimationFrame(loop); }
+        function stopGameLoop() { if (gameState.activeGameLoopId) { cancelAnimationFrame(gameState.activeGameLoopId); gameState.activeGameLoopId = null; } }
+        function startTimers() { clearAllTimers(); gameState.timers.scoreUpdate = setInterval(() => { if (!gameState.paused && gameState.currentScreen === 'gameplay') { gameState.currentScore += POINTS.PER_SECOND_SURVIVAL; } }, 1000); gameState.timers.objectSpawn = setInterval(() => { if (!gameState.paused && gameState.currentScreen === 'gameplay') { const type = Math.random() < 0.68 ? 'food' : 'obstacle'; spawnGameObject(type); } }, 1800 + Math.random() * 1400); gameState.timers.coinSpawn = setInterval(() => { if (!gameState.paused && gameState.currentScreen === 'gameplay') { spawnGameObject('coin'); } }, 8000 + Math.random() * 4000); }
+        function clearAllTimers() { Object.values(gameState.timers).forEach(timerId => { if (timerId) clearInterval(timerId); }); gameState.timers = { objectSpawn: null, coinSpawn: null, scoreUpdate: null }; }
+        function spawnGameObject(type) { if (!gameArea) return; const objEl = document.createElement('div'); objEl.classList.add('gameObject'); let imgSrcFilename, className; let width, height; if (type === 'food') { className = 'foodItem'; imgSrcFilename = FOOD_IMAGE_FILES[Math.floor(Math.random() * FOOD_IMAGE_FILES.length)]; width = 30; height = 30; } else if (type === 'obstacle') { className = 'obstacleItem'; imgSrcFilename = OBSTACLE_IMAGE_FILES[Math.floor(Math.random() * OBSTACLE_IMAGE_FILES.length)]; width = 50; height = 50; } else if (type === 'coin') { className = 'collectibleCoin'; imgSrcFilename = COIN_IMAGE_FILE; width = 25; height = 25; } else { console.error("Unknown game object type to spawn:", type); return; } objEl.classList.add(className); objEl.dataset.type = type; objEl.style.backgroundImage = `url('${imgSrcFilename}')`; objEl.style.width = `${width}px`; objEl.style.height = `${height}px`; const img = new Image(); img.src = imgSrcFilename; img.onerror = () => { console.error(`CRITICAL: Failed to load image for spawned object ${type}: ${imgSrcFilename}`); objEl.style.backgroundColor = "magenta"; objEl.innerHTML = "X"; }; const gameAreaHeight = gameArea.clientHeight; const verticalMargin = gameAreaHeight * 0.05; const spawnableHeight = gameAreaHeight - (2 * verticalMargin) - height; objEl.style.top = `${Math.random() * spawnableHeight + verticalMargin}px`; objEl.style.right = `-${width}px`; gameArea.appendChild(objEl); }
+        function moveGameObjects() { if (!gameArea) return; const objects = gameArea.querySelectorAll('.gameObject'); objects.forEach(obj => { let currentRight = parseFloat(obj.style.right); if (isNaN(currentRight)) { currentRight = -parseFloat(obj.style.width || "50"); } currentRight += gameState.gameSpeed; obj.style.right = `${currentRight}px`; if (currentRight > gameArea.clientWidth + parseFloat(obj.style.width || "50") + 50) { obj.remove(); } }); }
+        function checkCollisions() { if (!playerBirdElement || !playerBirdElement.offsetParent || !gameArea) return; const birdRect = playerBirdElement.getBoundingClientRect(); const objects = gameArea.querySelectorAll('.gameObject'); objects.forEach(obj => { if (!obj.offsetParent) return; const objRect = obj.getBoundingClientRect(); if (birdRect.left < objRect.right && birdRect.right > objRect.left && birdRect.top < objRect.bottom && birdRect.bottom > objRect.top) { handleCollision(obj, obj.dataset.type); } }); }
+        function handleCollision(objectElement, type) { if (!objectElement) return; if (type === 'food') { gameState.hungryPercent = Math.min(100, gameState.hungryPercent + FOOD_VALUE); gameState.currentScore += POINTS.PER_FOOD; playSound(eatSound); checkCheckpointLogic(); } else if (type === 'obstacle') { gameState.lives--; if (playerBirdElement) { playerBirdElement.style.opacity = '0.5'; setTimeout(() => { if(playerBirdElement) playerBirdElement.style.opacity = '1'; }, 200); } if (gameState.lives <= 0) gameOver("Crashed!"); } else if (type === 'coin') { gameState.currentRoundCoins++; if (gameState.selectedBird === 'sparrow') gameState.currentRoundCoins++; gameState.currentScore += POINTS.PER_COIN; } objectElement.remove(); }
+        function checkCheckpointLogic() { if (gameState.hungryPercent >= 100 && gameState.checkpointsReached < MAX_CHECKPOINTS) { gameState.checkpointsReached++; gameState.hungryPercent = 90; if (gameState.checkpointsReached === MAX_CHECKPOINTS) { gameWin(); } else { displayCheckpointMessage(`Checkpoint ${gameState.checkpointsReached}`); } } }
+        function displayCheckpointMessage(message) { if (!checkpointMessageElement) return; checkpointMessageElement.textContent = message; checkpointMessageElement.classList.remove('hidden'); checkpointMessageElement.classList.add('show'); setTimeout(() => { checkpointMessageElement.classList.remove('show'); checkpointMessageElement.classList.add('hidden'); }, 2000); }
+        function prepareEndGameScreen(isWin) { gameState.paused = true; stopGameLoop(); clearAllTimers(); gameState.lifetimeCoins += gameState.currentRoundCoins; if (gameState.currentScore > gameState.highScore) { gameState.highScore = gameState.currentScore; } saveGameData(); if(endGameTitle) endGameTitle.textContent = isWin ? "YOU WIN!" : "GAME OVER!"; if(roundScoreDisplay) roundScoreDisplay.textContent = gameState.currentScore; if(roundCoinsDisplay) roundCoinsDisplay.textContent = gameState.currentRoundCoins; const duration = gameState.gameStartTime ? Date.now() - gameState.gameStartTime : 0; if(playTimeDisplay) playTimeDisplay.textContent = formatTime(duration); if (isWin) { playSound(gameWonSound); } else { playSound(gameOverSound); } showScreen('endGame'); }
+        function gameOver(reason) { if (gameState.currentScreen === 'endGame' && gameState.paused) return; prepareEndGameScreen(false); }
+        function gameWin() { if (gameState.currentScreen === 'endGame' && gameState.paused) return; prepareEndGameScreen(true); }
+
+        // MODIFIED togglePause to handle gameTitleHeader visibility
+        function togglePause() {
+            gameState.paused = !gameState.paused;
+            if (pauseOverlay) pauseOverlay.classList.toggle('hidden', !gameState.paused);
+
+            if (gameTitleHeader && gameState.currentScreen === 'mainMenu') { // Ensure title stays if pausing from main menu (though not typical)
+                gameTitleHeader.style.display = 'block';
+            } else if (gameTitleHeader) { // For other screens (like gameplay), hide title when paused
+                gameTitleHeader.style.display = gameState.paused ? 'none' : 'none'; // It should already be none for gameplay
+            }
+
+
+            if (!gameState.paused && gameState.currentScreen === 'gameplay') {
+                startGameLoop(); startTimers();
+            } else {
+                stopGameLoop(); clearAllTimers();
+            }
+        }
+
+        // --- EVENT LISTENER SETUP ---
+        function setupEventListeners() {
+            if(playBtn) playBtn.addEventListener('click', initializeNewGame);
+            if(settingsBtn) settingsBtn.addEventListener('click', () => showScreen('settings'));
+            if(marketplaceBtn) marketplaceBtn.addEventListener('click', () => { updateMarketplaceUI(); showScreen('marketplace'); });
+            if(backFromSettingsBtn) { backFromSettingsBtn.addEventListener('click', () => { saveGameData(); updateBirdNameOnCharacterDisplay(); showScreen('mainMenu'); }); }
+            if(backFromMarketplaceBtn) backFromMarketplaceBtn.addEventListener('click', () => showScreen('mainMenu'));
+            if(pauseBtn) pauseBtn.addEventListener('click', togglePause);
+            if(resumeBtn) resumeBtn.addEventListener('click', togglePause);
+            if(mainMenuFromPauseBtn) mainMenuFromPauseBtn.addEventListener('click', () => { if (gameState.paused) togglePause(); stopGameLoop(); clearAllTimers(); showScreen('mainMenu'); }); // Should make title visible here
+            document.addEventListener('keydown', (e) => { if (gameState.currentScreen !== 'gameplay' || gameState.paused) return; if (e.key === 'ArrowUp' || e.key === ' ' || e.key.toLowerCase() === 'w') { e.preventDefault(); gameState.birdProps.speedY = gameState.birdProps.jumpStrength; } if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') { e.preventDefault(); gameState.birdProps.speedY += gameState.birdProps.gravity * 1.5; } });
+            if(upArrowTouchBtn) upArrowTouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameState.currentScreen === 'gameplay' && !gameState.paused) gameState.birdProps.speedY = gameState.birdProps.jumpStrength; });
+            if(downArrowTouchBtn) downArrowTouchBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameState.currentScreen === 'gameplay' && !gameState.paused) gameState.birdProps.speedY += gameState.birdProps.gravity * 2; });
+            if(soundToggle) soundToggle.addEventListener('change', () => { gameState.soundOn = soundToggle.checked; saveGameData(); });
+            if(showNameToggle) showNameToggle.addEventListener('change', () => { gameState.showName = showNameToggle.checked; updateBirdNameOnCharacterDisplay(); saveGameData(); });
+            if(resetGameDataBtn) resetGameDataBtn.addEventListener('click', () => { if (confirm("Are you sure you want to reset ALL game data? This includes coins, unlocked birds, and high score. This action cannot be undone.")) { localStorage.removeItem(STORAGE_KEY); gameState.lifetimeCoins = 0; gameState.selectedBird = 'crow'; gameState.birdUnlocked = { sparrow: false }; gameState.soundOn = true; gameState.showName = true; gameState.highScore = 0; saveGameData(); loadGameData(); alert("Game data has been reset."); updateMarketplaceUI(); } });
+            if (birdOptionsContainer) { birdOptionsContainer.addEventListener('click', (e) => { const targetButton = e.target.closest('button'); if (!targetButton) return; const birdOptionDiv = targetButton.closest('.bird-option'); if (!birdOptionDiv) return; const birdName = birdOptionDiv.dataset.bird; if (!birdName) return; if (targetButton.classList.contains('purchase-bird-btn')) { const price = parseInt(targetButton.dataset.price); if (gameState.lifetimeCoins >= price && !gameState.birdUnlocked[birdName]) { gameState.lifetimeCoins -= price; gameState.birdUnlocked[birdName] = true; gameState.selectedBird = birdName; saveGameData(); updateMarketplaceUI(); } } else if (targetButton.classList.contains('select-bird-btn')) { if (birdName === 'crow' || gameState.birdUnlocked[birdName]) { gameState.selectedBird = birdName; saveGameData(); updateMarketplaceUI(); } } }); }
+            if(playAgainBtn) playAgainBtn.addEventListener('click', initializeNewGame);
+            if(mainMenuFromEndBtn) mainMenuFromEndBtn.addEventListener('click', () => showScreen('mainMenu')); // Should make title visible here
+            document.querySelectorAll('img').forEach(img => { img.onerror = () => { console.warn(`Image failed to load: ${img.src}`); img.alt = `(Image ${img.src.split('/').pop()} not found)`; }; });
+        }
+
+        // --- GAME INITIALIZATION ---
+        loadGameData();
+        setupEventListeners();
+        showScreen('mainMenu'); // Initial call will set title visibility
+        if(playerBirdElement) playerBirdElement.src = `${gameState.selectedBird}.gif`;
+
+    }); // End DOMContentLoaded
+</script>
+</body>
+</html>
